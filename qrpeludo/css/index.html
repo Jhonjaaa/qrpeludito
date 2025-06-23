@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QRpeludo</title>
+
+    <!-- Meta redes sociales -->
+    <meta property="og:image" content="https://4tsix0yujj.ufs.sh/f/2vMRHqOYUHc0K5prXUEjR7oilQcqGuVyEA8Sm1pf4v95nLIB" />
+    <meta property="og:image:alt" content="Imagen del proyecto" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://4tsix0yujj.ufs.sh/f/2vMRHqOYUHc0K5prXUEjR7oilQcqGuVyEA8Sm1pf4v95nLIB" />
+
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+    <!-- React y Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  </head>
+  <body class="bg-gradient-to-br from-purple-100 to-blue-100 min-h-screen font-sans">
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect } = React;
+      const { createRoot } = ReactDOM;
+
+      const firebaseConfig = {
+        apiKey: "TU_API_KEY",
+        authDomain: "TU_DOMINIO.firebaseapp.com",
+        projectId: "TU_PROJECT_ID",
+        storageBucket: "TU_BUCKET",
+        messagingSenderId: "TU_MENSAJERIA_ID",
+        appId: "TU_APP_ID"
+      };
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.firestore();
+
+      const App = () => {
+        const [pets, setPets] = useState([]);
+        const [currentPet, setCurrentPet] = useState(null);
+        const [showForm, setShowForm] = useState(false);
+
+        useEffect(() => {
+          const unsubscribe = db.collection("pets").onSnapshot(snapshot => {
+            const petsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setPets(petsData);
+          });
+          return () => unsubscribe();
+        }, []);
+
+        const handleSavePet = async (pet) => {
+          if (pet.id) {
+            await db.collection("pets").doc(pet.id).set(pet);
+          } else {
+            await db.collection("pets").add(pet);
+          }
+          setShowForm(false);
+          setCurrentPet(null);
+        };
+
+        const handleDeletePet = async (id) => {
+          await db.collection("pets").doc(id).delete();
+        };
+
+        const handleEditPet = (pet) => {
+          setCurrentPet(pet);
+          setShowForm(true);
+        };
+
+        const handleAddPet = () => {
+          setCurrentPet(null);
+          setShowForm(true);
+        };
+
+        return (
+          <div className="max-w-6xl mx-auto py-10 px-4">
+            <header className="mb-10 text-center">
+              <h1 className="text-5xl font-extrabold text-gray-800 drop-shadow-md mb-3">🐾 QRpeludo</h1>
+              <p className="text-lg text-gray-600">Registra, protege y encuentra a tus mascotas con un clic.</p>
+              <button onClick={handleAddPet} className="mt-6 bg-blue-600 text-white px-6 py-3 rounded-xl shadow-md hover:bg-blue-700 transition-all duration-300">
+                ➕ Agregar Mascota
+              </button>
+            </header>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {pets.map(pet => (
+                <div key={pet.id} className="bg-white rounded-2xl shadow-lg hover:shadow-2xl p-6 transform hover:-translate-y-1 transition duration-300">
+                  <img src={pet.photo || 'https://via.placeholder.com/300'} alt={pet.name} className="w-full h-48 object-cover rounded-xl mb-4 border" />
+                  <h3 className="text-2xl font-bold text-gray-800 mb-2">{pet.name}</h3>
+                  <p className="text-gray-600"><strong>Dueño:</strong> {pet.ownerName}</p>
+                  <p className="text-gray-600"><strong>Dirección:</strong> {pet.address}</p>
+                  <p className="text-gray-600 mb-3"><strong>Teléfono:</strong> {pet.phone}</p>
+                  <div className="flex justify-between">
+                    <button onClick={() => handleEditPet(pet)} className="bg-yellow-500 text-white px-4 py-2 rounded-lg shadow hover:bg-yellow-600">Editar</button>
+                    <button onClick={() => handleDeletePet(pet.id)} className="bg-red-600 text-white px-4 py-2 rounded-lg shadow hover:bg-red-700">Eliminar</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {showForm && (
+              <PetForm currentPet={currentPet} onSave={handleSavePet} onCancel={() => setShowForm(false)} />
+            )}
+          </div>
+        );
+      };
+
+      const PetForm = ({ currentPet, onSave, onCancel }) => {
+        const [pet, setPet] = useState(currentPet || {
+          name: '', ownerName: '', address: '', phone: '', photo: ''
+        });
+
+        const handleChange = (e) => {
+          const { name, value } = e.target;
+          setPet(prev => ({ ...prev, [name]: value }));
+        };
+
+        const handlePhotoUpload = (e) => {
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              setPet(prev => ({ ...prev, photo: reader.result }));
+            };
+            reader.readAsDataURL(file);
+          }
+        };
+
+        const handleSubmit = (e) => {
+          e.preventDefault();
+          onSave({ ...pet, id: pet.id || undefined });
+        };
+
+        return (
+          <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 backdrop-blur-sm">
+            <form onSubmit={handleSubmit} className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-lg">
+              <h2 className="text-3xl font-bold text-center text-gray-800 mb-6">{pet.id ? 'Editar Mascota' : 'Nueva Mascota'}</h2>
+              {['name', 'ownerName', 'address', 'phone'].map(field => (
+                <input
+                  key={field}
+                  name={field}
+                  value={pet[field]}
+                  onChange={handleChange}
+                  placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
+                  className="block w-full mb-4 px-4 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              ))}
+              <input type="file" accept="image/*" onChange={handlePhotoUpload} className="mb-4" />
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={onCancel} className="bg-gray-300 text-gray-800 px-5 py-2 rounded-xl shadow hover:bg-gray-400">Cancelar</button>
+                <button type="submit" className="bg-blue-600 text-white px-5 py-2 rounded-xl shadow hover:bg-blue-700">Guardar</button>
+              </div>
+            </form>
+          </div>
+        );
+      };
+
+      const root = createRoot(document.getElementById("root"));
+      root.render(<React.StrictMode><App /></React.StrictMode>);
+    </script>
+  </body>
+</html>
